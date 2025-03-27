@@ -108,6 +108,9 @@ class AbilityCreationScreen(ThemedScreen):
 
         app.user_data["entry_name"] = self.entry_name.text
         app.user_data["entry_description"] = self.entry_description.text
+        """Очистка полей ввода при уходе с экрана"""
+        self.entry_name.text = ""
+        self.entry_description.text = ""
 
     def next_screen(self, instance):
         """Сохраняем данные и переходим к выбору типа действия"""
@@ -173,179 +176,267 @@ class ActionSelectionScreen(ThemedScreen):
         self.manager.get_screen("target").entry_description = self.entry_description
         self.manager.get_screen("target").action_type = self.spinner_action_type.text
         self.manager.current = "target"
-
+        """Очистка spinner при уходе с экрана"""
+        self.spinner_action_type.text = "Выберите"
 
 
 class TargetSelectionScreen(ThemedScreen):
+    """Экран выбора области действия с оптимизированными размерами"""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Добавляем атрибуты для передачи данных, как в старом коде
+        self.entry_name = ""
+        self.entry_description = ""
+        self.action_type = ""
         self.target_area = ""
 
-        self.layout = BoxLayout(orientation="vertical", spacing=10, padding=10)
-
-        # Спиннер для выбора области действия
-        self.spinner_action_area = Spinner(
-            text="Выберите область",
-            values=["Одна цель", "Несколько целей", "На себя", "Площадь"],
-            size_hint_y=None,
-            height=44
+        # Основной контейнер с вертикальной ориентацией
+        main_layout = BoxLayout(
+            orientation='vertical',
+            padding='20dp',
+            spacing='20dp'
         )
-        self.spinner_action_area.bind(text=self.update_area_options)
 
-        self.layout.add_widget(Label(text="Область действия:"))
-        self.layout.add_widget(self.spinner_action_area)
+        # Заголовок (уменьшенный текст)
+        title = Label(
+            text='Область действия',
+            size_hint=(1, None),
+            height='60dp',
+            font_size='18sp'
+        )
+        main_layout.add_widget(title)
 
-        # Динамические элементы
-        self.entry_target_count = TextInput(hint_text="Количество целей", size_hint_y=None, height=44)
-        self.entry_area_size = TextInput(hint_text="Размер (м²)", size_hint_y=None, height=44)
-        self.switch_can_move = Switch(active=False)
-        self.entry_move_range = TextInput(hint_text="Дальность перемещения", size_hint_y=None, height=44)
-        self.switch_label = Label(text="Можно перемещать?")
+        # Выбор типа области (компактный)
+        self.area_type = Spinner(
+            text='Выберите тип',
+            values=['Одна цель', 'Несколько целей', 'На себя', 'Площадь'],
+            size_hint=(1, None),
+            height='70dp',
+            font_size='16sp'
+        )
+        self.area_type.bind(text=self.update_options)
+        main_layout.add_widget(self.area_type)
 
-        # Контейнер для кнопки "Далее"
-        self.button_layout = BoxLayout(size_hint_y=None, height=50)
-        self.button_next = Button(text="Далее", on_press=self.next_screen, size_hint=(1, None), height=44)
-        self.button_layout.add_widget(self.button_next)
+        # Контейнер для динамических элементов
+        self.options_container = BoxLayout(
+            orientation='vertical',
+            size_hint=(1, None),
+            height='250dp',
+            spacing='15dp'
+        )
+        main_layout.add_widget(self.options_container)
 
-        self.layout.add_widget(self.button_layout)
-        self.add_widget(self.layout)
+        # Создаем элементы управления
+        self.create_option_widgets()
 
-    def update_area_options(self, instance, value):
-        # Удаляем старые элементы перед добавлением новых
-        for widget in [self.entry_target_count, self.entry_area_size, self.switch_label, self.switch_can_move,
-                       self.entry_move_range]:
-            if widget in self.layout.children:
-                self.layout.remove_widget(widget)
+        # Кнопка далее (крупная)
+        next_btn = Button(
+            text='Далее',
+            size_hint=(1, None),
+            height='80dp',
+            font_size='18sp'
+        )
+        next_btn.bind(on_press=self.go_next)
+        main_layout.add_widget(next_btn)
 
-        # Очищаем поля ввода
-        self.entry_target_count.text = ""
-        self.entry_area_size.text = ""
-        self.entry_move_range.text = ""
+        # Добавляем прокрутку
+        scroll = ScrollView()
+        scroll.add_widget(main_layout)
+        self.add_widget(scroll)
 
-        # Логика отображения
-        if value == "Несколько целей":
-            self.layout.add_widget(self.entry_target_count)
-        elif value == "Площадь":
-            self.layout.add_widget(self.entry_area_size)
-            self.layout.add_widget(self.switch_label)
-            self.layout.add_widget(self.switch_can_move)
-            self.layout.add_widget(self.entry_move_range)
+    def on_pre_enter(self):
+        """Получаем данные от предыдущих экранов, как в старом коде"""
+        prev_screen = self.manager.get_screen('action')
+        self.entry_name = prev_screen.entry_name
+        self.entry_description = prev_screen.entry_description
+        self.action_type = prev_screen.spinner_action_type.text
 
-        # Перемещаем кнопку "Далее" в конец списка виджетов
-        if self.button_layout in self.layout.children:
-            self.layout.remove_widget(self.button_layout)
-        self.layout.add_widget(self.button_layout)
+    def create_option_widgets(self):
+        """Создает элементы для разных вариантов выбора"""
+        # Для нескольких целей
+        self.multi_target_layout = BoxLayout(
+            orientation='horizontal',
+            size_hint=(1, None),
+            height='60dp'
+        )
+        self.multi_target_layout.add_widget(Label(
+            text='Кол-во целей:',
+            size_hint=(0.6, 1),
+            font_size='16sp'
+        ))
+        self.target_count = TextInput(
+            multiline=False,
+            input_filter='int',
+            hint_text='2',
+            size_hint=(0.4, 1),
+            font_size='16sp',
+            height='60dp'
+        )
+        self.multi_target_layout.add_widget(self.target_count)
 
-    def save_data(self, key, value):
-        """Сохраняет данные в глобальный словарь"""
-        app = App.get_running_app()
-        app.user_data[key] = value
+        # Для площади
+        self.area_layout = BoxLayout(
+            orientation='vertical',
+            size_hint=(1, None),
+            height='180dp',
+            spacing='10dp'
+        )
 
-    def on_pre_leave(self):
-        """Сохраняем область действия, количество целей, размер площади и перемещение."""
-        app = App.get_running_app()
-        if not hasattr(app, "user_data"):
-            app.user_data = {}
+        # Размер площади
+        area_size_row = BoxLayout(
+            orientation='horizontal',
+            size_hint=(1, None),
+            height='60dp'
+        )
+        area_size_row.add_widget(Label(
+            text='Размер (м²):',
+            size_hint=(0.6, 1),
+            font_size='16sp'
+        ))
+        self.area_size = TextInput(
+            multiline=False,
+            input_filter='int',
+            hint_text='3',
+            size_hint=(0.4, 1),
+            font_size='16sp',
+            height='60dp'
+        )
+        area_size_row.add_widget(self.area_size)
 
-        target_area = self.spinner_action_area.text  # "Одна цель", "Несколько целей", "Площадь", "На себя"
+        # Переключатель перемещения
+        switch_row = BoxLayout(
+            orientation='horizontal',
+            size_hint=(1, None),
+            height='60dp'
+        )
+        switch_row.add_widget(Label(
+            text='Перемещаемая:',
+            size_hint=(0.6, 1),
+            font_size='16sp'
+        ))
+        self.move_switch = Switch(active=False, size_hint=(0.4, 1))
+        switch_row.add_widget(self.move_switch)
 
-        # Если выбрано "Несколько целей", сохраняем их количество
-        if target_area == "Несколько целей":
-            try:
-                num_targets = int(self.entry_target_count.text)  # Берём введённое число
-                if num_targets < 1:
-                    self.show_error("Ошибка", "Количество целей должно быть больше 0.")
+        # Дальность перемещения
+        self.move_range_row = BoxLayout(
+            orientation='horizontal',
+            size_hint=(1, None),
+            height='60dp'
+        )
+        self.move_range_row.add_widget(Label(
+            text='Дальность (м):',
+            size_hint=(0.6, 1),
+            font_size='16sp'
+        ))
+        self.move_range = TextInput(
+            multiline=False,
+            input_filter='int',
+            hint_text='3',
+            disabled=True,
+            size_hint=(0.4, 1),
+            font_size='16sp',
+            height='60dp'
+        )
+        self.move_range_row.add_widget(self.move_range)
+
+        # Собираем всё вместе
+        self.area_layout.add_widget(area_size_row)
+        self.area_layout.add_widget(switch_row)
+        self.area_layout.add_widget(self.move_range_row)
+
+        # Привязываем события
+        self.move_switch.bind(active=self.toggle_move_range)
+
+    def toggle_move_range(self, instance, value):
+        """Управляет доступностью поля дальности перемещения"""
+        self.move_range.disabled = not value
+        self.move_range.text = '' if value else ''
+
+    def update_options(self, instance, value):
+        """Обновляет отображаемые элементы управления"""
+        self.options_container.clear_widgets()
+
+        if value == 'Несколько целей':
+            self.options_container.add_widget(self.multi_target_layout)
+        elif value == 'Площадь':
+            self.options_container.add_widget(self.area_layout)
+
+    def go_next(self, instance):
+        """Обрабатывает переход к следующему экрану"""
+        area_type = self.area_type.text
+
+        if area_type == 'Несколько целей':
+            if not self.validate_input(self.target_count.text, 'количество целей'):
+                return
+            count = int(self.target_count.text or '2')
+            target_area = f'Несколько целей ({count})'
+
+        elif area_type == 'Площадь':
+            if not self.validate_input(self.area_size.text, 'размер площади'):
+                return
+
+            size = int(self.area_size.text or '3')
+            if self.move_switch.active:
+                if not self.validate_input(self.move_range.text, 'дальность перемещения'):
                     return
-                target_area = f"Несколько целей ({num_targets})"  # Например, "Несколько целей (3)"
-            except ValueError:
-                self.show_warning("Внимание",
-                                  "Количество целей не указано. Будет использовано значение по умолчанию: 2.")
-                target_area = "Несколько целей (2)"  # Если число не введено, ставим 2 по умолчанию
-
-        # Если выбрана "Площадь", сохраняем её размер (м²) и возможность перемещения
-        elif target_area == "Площадь":
-            try:
-                area_size = int(self.entry_area_size.text)  # Берём размер (м²)
-                if area_size < 1:
-                    self.show_error("Ошибка", "Размер площади должен быть больше 0.")
-                    return
-            except ValueError:
-                self.show_warning("Внимание",
-                                  "Размер площади не указан. Будет использовано значение по умолчанию: 3 м².")
-                area_size = 3  # Если число не введено, ставим 3 м² по умолчанию
-
-            # Проверяем, включено ли перемещение области
-            can_move = self.switch_can_move.active  # True / False
-            move_range = 0  # Дальность перемещения (если включено)
-
-            if can_move:
-                try:
-                    move_range = int(self.entry_move_range.text)  # Берём введённое значение
-                    if move_range < 0:
-                        self.show_error("Ошибка", "Дальность перемещения должна быть неотрицательной.")
-                        return
-                except ValueError:
-                    self.show_warning("Внимание",
-                                      "Дальность перемещения не указана. Будет использовано значение по умолчанию: 3 м.")
-                    move_range = 3  # Если не введено, ставим 3 м по умолчанию
-
-            # Формируем строку для сохранения
-            if can_move:
-                target_area = f"Площадь ({area_size} м², перемещение {move_range} м)"
+                move = int(self.move_range.text or '3')
+                target_area = f'Площадь ({size} м², перемещение {move} м)'
             else:
-                target_area = f"Площадь ({area_size} м²)"
+                target_area = f'Площадь ({size} м²)'
+        else:
+            target_area = area_type  # "Одна цель" или "На себя"
 
-        app.user_data["spinner_action_area"] = target_area  # Сохраняем с числом!
-
-
-    def on_pre_leave(self):
-        """Сохраняем область действия, количество целей, размер площади и перемещение."""
+        # Сохраняем в user_data для использования на последнем экране
         app = App.get_running_app()
-        if not hasattr(app, "user_data"):
-            app.user_data = {}
+        app.user_data['target_area'] = target_area
 
-        target_area = self.spinner_action_area.text  # "Одна цель", "Несколько целей", "Площадь", "На себя"
+        # Передаем данные следующему экрану
+        duration_screen = self.manager.get_screen('duration')
+        duration_screen.entry_name = self.entry_name
+        duration_screen.entry_description = self.entry_description
+        duration_screen.action_type = self.action_type
+        duration_screen.target_area = target_area  # Используем вычисленное значение
 
-        # Если выбрано "Несколько целей", сохраняем их количество
-        if target_area == "Несколько целей":
-            try:
-                num_targets = int(self.entry_target_count.text)  # Берём введённое число
-                target_area = f"Несколько целей ({num_targets})"  # Например, "Несколько целей (3)"
-            except ValueError:
-                target_area = "Несколько целей (2)"  # Если число не введено, ставим 2 по умолчанию
+        self.manager.current = 'duration'
 
-        # Если выбрана "Площадь", сохраняем её размер (м²) и возможность перемещения
-        elif target_area == "Площадь":
-            try:
-                area_size = int(self.entry_area_size.text)  # Берём размер (м²)
-            except ValueError:
-                area_size = 3  # Если число не введено, ставим 3 м² по умолчанию
+    def on_leave(self, *args):
+        """Очищает экран при уходе"""
+        self.clear_inputs()
+        return super().on_leave(*args)
 
-            # Проверяем, включено ли перемещение области
-            can_move = self.switch_can_move.active  # True / False
-            move_range = 0  # Дальность перемещения (если включено)
+    def clear_inputs(self):
+        """Сбрасывает все поля ввода"""
+        self.area_type.text = 'Выберите тип'
+        self.target_count.text = ''
+        self.area_size.text = ''
+        self.move_switch.active = False
+        self.move_range.text = ''
+        self.options_container.clear_widgets()
 
-            if can_move:
-                try:
-                    move_range = int(self.entry_move_range.text)  # Берём введённое значение
-                except ValueError:
-                    move_range = 3  # Если не введено, ставим 3 м по умолчанию
+    def validate_input(self, value, field_name):
+        """Проверяет корректность ввода"""
+        if not value.strip():
+            return True  # Допускаем пустое значение
 
-            # Формируем строку для сохранения
-            if can_move:
-                target_area = f"Площадь ({area_size} м², перемещение {move_range} м)"
-            else:
-                target_area = f"Площадь ({area_size} м²)"
+        try:
+            num = int(value)
+            if num < 1:
+                self.show_error('Некорректное значение', f'{field_name.capitalize()} должно быть больше 0')
+                return False
+            return True
+        except ValueError:
+            self.show_error('Ошибка ввода', f'Введите целое число для {field_name}')
+            return False
 
-        app.user_data["spinner_action_area"] = target_area  # Сохраняем с числом!
+    def show_error(self, title, message):
+        """Отображает сообщение об ошибке"""
+        Popup(
+            title=title,
+            content=Label(text=message),
+            size_hint=(0.7, 0.3)
+        ).open()
 
-    def next_screen(self, instance):
-        """Сохраняем выбор и переходим к продолжительности"""
-        self.manager.get_screen("duration").entry_name = self.entry_name
-        self.manager.get_screen("duration").entry_description = self.entry_description
-        self.manager.get_screen("duration").action_type = self.action_type
-        self.manager.get_screen("duration").target_area = self.spinner_action_area.text
-        self.manager.current = "duration"
 
 
 class DurationSelectionScreen(ThemedScreen):
@@ -433,11 +524,15 @@ class DurationSelectionScreen(ThemedScreen):
             if duration in ["Раунды", "Минуты", "Часы"]:
                 try:
                     value = int(self.entry_duration_number.text)  # Берём введённое число
-                    duration = f"{value} {duration}"  # Например, "3 Раунда"
+                    duration = f"{value} {duration}"  # Например, "3 Раунды"
                 except ValueError:
                     duration = f"1 {duration}"  # Если число не введено, ставим 1
 
             app.user_data["spinner_duration"] = duration  # Сохраняем с числом!
+            """Очистка виджетов выбора длительности"""
+            self.spinner_duration.text = "Выберите"
+            if hasattr(self, "entry_duration_number"):
+                self.entry_duration_number.text = ""
 
 
 class ProbabilitySelectionScreen(ThemedScreen):
@@ -494,6 +589,8 @@ class ProbabilitySelectionScreen(ThemedScreen):
                 app.user_data = {}
 
             app.user_data["spinner_probability"] = self.spinner_probability.text
+            """Очистка spinner вероятности"""
+            self.spinner_probability.text = "Выберите"
 
 
 class RangeSelectionScreen(ThemedScreen):
@@ -538,6 +635,8 @@ class RangeSelectionScreen(ThemedScreen):
             app.user_data = {}
 
         app.user_data["entry_range"] = self.entry_range.text
+        """Очистка поля ввода дальности"""
+        self.entry_range.text = ""
 
     def process_range(self, instance):
         """Проверяем ввод и рассчитываем стоимость дальности"""
@@ -586,13 +685,6 @@ class RangeSelectionScreen(ThemedScreen):
         app = App.get_running_app()
         app.user_data[key] = value
 
-    def on_pre_leave(self):
-        """Сохраняем дальность способности"""
-        app = App.get_running_app()
-        if not hasattr(app, "user_data"):
-            app.user_data = {}
-
-        app.user_data["entry_range"] = self.entry_range.text
 
 
 class EffectsSelectionScreen(ThemedScreen):
@@ -643,7 +735,6 @@ class EffectsSelectionScreen(ThemedScreen):
                 self.show_error("Ошибка", "Выберите эффект перед добавлением.")
                 return
 
-            self.selected_effects.append(effect)
             self.label_selected.text = f"Выбранные эффекты: {', '.join(self.selected_effects)}"
 
             # Переход на соответствующий экран
@@ -684,6 +775,10 @@ class EffectsSelectionScreen(ThemedScreen):
             self.manager.get_screen("final_summary").range_value = self.range_value
             self.manager.get_screen("final_summary").selected_effects = self.selected_effects
             self.manager.current = "final_summary"
+            """Сброс выбранных эффектов"""
+            self.spinner_effects.text = "Выберите"
+            self.selected_effects = []
+            self.label_selected.text = "Выбранные эффекты: None"
 
         def show_error(self, title, message):
             """Всплывающее окно ошибки"""
@@ -731,25 +826,25 @@ class DamageSelectionScreen(ThemedScreen):
             try:
                 dice_count = int(self.entry_dice_count.text)
             except ValueError:
-                self.show_error("Ошибка", "Введите корректное число кубиков.")
+                self.show_error("Ошибка", "Введите корректное число костей.")
                 return
 
             if damage_type == "Выберите":
                 self.show_error("Ошибка", "Выберите тип урона.")
                 return
+            """Очистка параметров урона"""
+            self.spinner_damage_type.text = "Выберите"
+            self.entry_dice_count.text = ""
 
             # Формируем строку с описанием урона
             damage_description = f"Урон: {dice_count}x{damage_type}"
 
-            # Сохраняем эффект в список выбранных эффектов
-            effects_screen = self.manager.get_screen("effects")
-            effects_screen.selected_effects.append(damage_description)
-
-            # Сохраняем данные в глобальный словарь user_data
+            # === ВСТАВИТЬ ЗДЕСЬ ===
             app = App.get_running_app()
-            if not hasattr(app, "user_data"):
-                app.user_data = {}
-            app.user_data["damage"] = damage_description
+            app.user_data["damage"] = damage_description  # Сохраняем в глобальные данные
+            effects_screen = self.manager.get_screen("effects")
+            effects_screen.selected_effects.append(damage_description)  # Добавляем в текущий список эффектов
+            # ======================
 
             # Возвращаемся в меню эффектов
             self.manager.current = "effects"
@@ -802,21 +897,19 @@ class HealingSelectionScreen(ThemedScreen):
                 self.show_error("Ошибка", "Выберите тип лечения.")
                 return
 
-            # Формируем строку с описанием лечения
             healing_description = f"Лечение: {dice_count}x{healing_type}"
 
-            # Сохраняем эффект в список выбранных эффектов
+            # === ВСТАВИТЬ ЗДЕСЬ ===
+            app = App.get_running_app()
+            app.user_data["healing"] = healing_description
             effects_screen = self.manager.get_screen("effects")
             effects_screen.selected_effects.append(healing_description)
+            # ======================
 
-            # Сохраняем данные в глобальный словарь user_data
-            app = App.get_running_app()
-            if not hasattr(app, "user_data"):
-                app.user_data = {}
-            app.user_data["healing"] = healing_description
-
-            # Возвращаемся в меню эффектов
             self.manager.current = "effects"
+            """Очистка параметров лечения"""
+            self.spinner_healing_type.text = "Выберите"
+            self.entry_dice_count.text = ""
 
         def show_error(self, title, message):
             """Всплывающее окно ошибки"""
@@ -865,6 +958,8 @@ class ExtraActionSelectionScreen(ThemedScreen):
             self.manager.current = "extra_action_desc"
         except ValueError:
             self.show_error("Ошибка", "Введите корректное число.")
+        """Очистка поля ввода количества действий"""
+        self.entry_extra_count.text = ""
 
     def show_error(self, title, message):
         """Всплывающее окно ошибки"""
@@ -916,101 +1011,137 @@ class ExtraActionDescriptionScreen(ThemedScreen):
 
 
 class DescriptorsSelectionScreen(ThemedScreen):
-        """Экран ввода дескрипторов"""
+    """Экран ввода дескрипторов"""
 
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.descriptors = []
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.descriptors = []  # Список для хранения дескрипторов
 
-            layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
 
-            self.label_descriptors = Label(text="Введите дескриптор способности:")
-            self.entry_descriptors = TextInput(multiline=False)
+        self.label_descriptors = Label(text="Введите дескриптор способности:")
+        self.entry_descriptors = TextInput(multiline=False)
 
-            self.button_add = Button(text="Добавить", on_press=self.add_descriptor)
-            self.button_done = Button(text="Готово", on_press=self.finish_selection)
+        self.button_add = Button(text="Добавить", on_press=self.add_descriptor)
+        self.button_done = Button(text="Готово", on_press=self.finish_selection)
 
-            self.label_selected = Label(text="Выбранные дескрипторы: None", size_hint_y=None, height=40)
+        self.label_selected = Label(text="Выбранные дескрипторы: None", size_hint_y=None, height=40)
 
-            layout.add_widget(self.label_descriptors)
-            layout.add_widget(self.entry_descriptors)
-            layout.add_widget(self.button_add)
-            layout.add_widget(self.label_selected)
-            layout.add_widget(self.button_done)
+        layout.add_widget(self.label_descriptors)
+        layout.add_widget(self.entry_descriptors)
+        layout.add_widget(self.button_add)
+        layout.add_widget(self.label_selected)
+        layout.add_widget(self.button_done)
 
-            self.add_widget(layout)
+        self.add_widget(layout)
 
-        def add_descriptor(self, instance):
-            """Добавляем дескриптор в список"""
-            descriptor = self.entry_descriptors.text.strip()
+    def add_descriptor(self, instance):
+        """Добавляем дескриптор в список"""
+        descriptor = self.entry_descriptors.text.strip()
 
-            if descriptor:
-                self.descriptors.append(descriptor)
-                self.label_selected.text = f"Выбранные дескрипторы: {', '.join(self.descriptors)}"
-                self.entry_descriptors.text = ""
+        if descriptor:
+            self.descriptors.append(descriptor)
+            self.label_selected.text = f"Выбранные дескрипторы: {', '.join(self.descriptors)}"
+            self.entry_descriptors.text = ""
 
-        def finish_selection(self, instance):
-            """Сохраняем дескрипторы и переходим к следующему шагу"""
-            effects_screen = self.manager.get_screen("effects")
-            effects_screen.selected_effects.append(f"Дескрипторы: {', '.join(self.descriptors)}")
-            self.manager.current = "effects"
+    def finish_selection(self, instance):
+        """Сохраняем дескрипторы и переходим к следующему шагу"""
+        app = App.get_running_app()
+        if not hasattr(app, "user_data"):
+            app.user_data = {}
+
+        # Сохраняем дескрипторы в user_data
+        app.user_data["descriptors"] = self.descriptors
+
+        # Переходим к экрану эффектов
+        effects_screen = self.manager.get_screen("effects")
+        effects_screen.selected_effects.append(f"Дескрипторы: {', '.join(self.descriptors)}")
+        self.manager.current = "effects"
+        """Очистка списка дескрипторов"""
+        self.descriptors = []
+        self.entry_descriptors.text = ""
+        self.label_selected.text = "Выбранные дескрипторы: None"
 
 
 class BonusesSelectionScreen(ThemedScreen):
-        """Экран ввода бонусов и штрафов"""
+    """Экран ввода бонусов и штрафов"""
 
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.bonuses = []
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.bonuses = []  # Список для хранения бонусов/штрафов
 
-            layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
 
-            self.label_bonuses = Label(text="Введите характеристику для бонуса/штрафа:")
-            self.entry_bonuses = TextInput(multiline=False)
+        self.label_bonuses = Label(text="Введите характеристику для бонуса/штрафа:")
+        self.entry_bonuses = TextInput(multiline=False)
 
-            self.label_bonuses_value = Label(text="Введите значение (число):")
-            self.entry_bonuses_value = TextInput(multiline=False, input_filter="int")
+        self.label_bonuses_value = Label(text="Введите значение (число):")
+        self.entry_bonuses_value = TextInput(multiline=False, input_filter="int")
 
-            self.button_add = Button(text="Добавить", on_press=self.add_bonus)
-            self.button_done = Button(text="Готово", on_press=self.finish_selection)
+        self.button_add = Button(text="Добавить", on_press=self.add_bonus)
+        self.button_done = Button(text="Готово", on_press=self.finish_selection)
 
-            self.label_selected = Label(text="Выбранные бонусы/штрафы: None", size_hint_y=None, height=40)
+        self.label_selected = Label(text="Выбранные бонусы/штрафы: None", size_hint_y=None, height=40)
 
-            layout.add_widget(self.label_bonuses)
-            layout.add_widget(self.entry_bonuses)
-            layout.add_widget(self.label_bonuses_value)
-            layout.add_widget(self.entry_bonuses_value)
-            layout.add_widget(self.button_add)
-            layout.add_widget(self.label_selected)
-            layout.add_widget(self.button_done)
+        layout.add_widget(self.label_bonuses)
+        layout.add_widget(self.entry_bonuses)
+        layout.add_widget(self.label_bonuses_value)
+        layout.add_widget(self.entry_bonuses_value)
+        layout.add_widget(self.button_add)
+        layout.add_widget(self.label_selected)
+        layout.add_widget(self.button_done)
 
-            self.add_widget(layout)
+        self.add_widget(layout)
 
-        def add_bonus(self, instance):
-            """Добавляем бонус/штраф в список"""
-            characteristic = self.entry_bonuses.text.strip()
-            value = self.entry_bonuses_value.text.strip()
+    def add_bonus(self, instance):
+        """Добавляем бонус/штраф в список"""
+        characteristic = self.entry_bonuses.text.strip()
+        value = self.entry_bonuses_value.text.strip()
 
-            if characteristic and value:
-                try:
-                    value = int(value)
-                    self.bonuses.append(f"{characteristic}: {value}")
-                    self.label_selected.text = f"Выбранные бонусы/штрафы: {', '.join(self.bonuses)}"
-                    self.entry_bonuses.text = ""
-                    self.entry_bonuses_value.text = ""
-                except ValueError:
-                    self.show_error("Ошибка", "Введите корректное число.")
+        if characteristic and value:
+            try:
+                value = int(value)
+                # Сохраняем абсолютное значение для расчета ОП
+                absolute_value = abs(value)
+                # Сохраняем бонус/штраф в виде словаря
+                bonus = {
+                    "characteristic": characteristic,
+                    "value": value,
+                    "absolute_value": absolute_value  # Добавляем абсолютное значение
+                }
+                self.bonuses.append(bonus)
+                # Обновляем список выбранных бонусов/штрафов
+                self.label_selected.text = f"Выбранные бонусы/штрафы: {', '.join([f'{b["characteristic"]}: {b["value"]}' for b in self.bonuses])}"
+                self.entry_bonuses.text = ""
+                self.entry_bonuses_value.text = ""
+            except ValueError:
+                self.show_error("Ошибка", "Введите корректное число.")
+        else:
+            self.show_error("Ошибка", "Заполните все поля.")
 
-        def finish_selection(self, instance):
-            """Сохраняем бонусы и штрафы и переходим к следующему шагу"""
-            effects_screen = self.manager.get_screen("effects")
-            effects_screen.selected_effects.append(f"Бонусы/Штрафы: {', '.join(self.bonuses)}")
-            self.manager.current = "effects"
+    def finish_selection(self, instance):
+        """Сохраняем бонусы и штрафы и переходим к следующему шагу"""
+        app = App.get_running_app()
+        if not hasattr(app, "user_data"):
+            app.user_data = {}
 
-        def show_error(self, title, message):
-            """Всплывающее окно ошибки"""
-            popup = Popup(title=title, content=Label(text=message), size_hint=(0.6, 0.3))
-            popup.open()
+        # Сохраняем бонусы/штрафы в user_data
+        app.user_data["bonuses"] = self.bonuses
+
+        # Переходим к экрану эффектов
+        effects_screen = self.manager.get_screen("effects")
+        effects_screen.selected_effects.append(f"Бонусы/Штрафы: {', '.join([f'{b['characteristic']}: {b['value']}' for b in self.bonuses])}")
+        self.manager.current = "effects"
+        """Сброс бонусов/штрафов"""
+        self.bonuses = []
+        self.entry_bonuses.text = ""
+        self.entry_bonuses_value.text = ""
+        self.label_selected.text = "Выбранные бонусы/штрафы: None"
+
+    def show_error(self, title, message):
+        """Всплывающее окно ошибки"""
+        popup = Popup(title=title, content=Label(text=message), size_hint=(0.6, 0.3))
+        popup.open()
 
 
 class CreatureCreationScreen(ThemedScreen):
@@ -1061,15 +1192,22 @@ class CreatureCreationScreen(ThemedScreen):
             try:
                 po = int(po)
                 control_cost = 0
+                control_text = control.split(" (")[0]  # Убираем ОП из типа контроля
                 if "устным командам" in control:
                     control_cost = 10
                 elif "полным ментальным контролем" in control:
                     control_cost = 20
 
                 total_cost = po * 25 + control_cost
-                creature_desc = f"{creature_name} (ПО: {po}, Контроль: {control}, Стоимость: {total_cost} ОП)"
-                self.creatures.append(creature_desc)
-                self.label_selected.text = f"Созданные существа: {', '.join(self.creatures)}"
+                # Сохраняем существо в формате: {"name": "Лошадь", "po": 5, "control": "Подчиняется устным командам", "cost": 135}
+                creature_data = {
+                    "name": creature_name,
+                    "po": po,
+                    "control": control_text,
+                    "cost": total_cost
+                }
+                self.creatures.append(creature_data)
+                self.label_selected.text = f"Созданные существа: {', '.join([c['name'] for c in self.creatures])}"
                 self.entry_creature.text = ""
                 self.entry_po.text = ""
             except ValueError:
@@ -1079,9 +1217,33 @@ class CreatureCreationScreen(ThemedScreen):
 
     def finish_selection(self, instance):
         """Сохраняем создание существ и переходим к следующему шагу"""
+        app = App.get_running_app()
+        if not hasattr(app, "user_data"):
+            app.user_data = {}
+
+        # Сохраняем созданные существа в user_data в правильном формате
+        app.user_data["created_creatures"] = [
+            {
+                "name": c["name"],
+                "po": c["po"],
+                "control": c["control"],
+                "cost": c["cost"]
+            }
+            for c in self.creatures
+        ]
+
+        # Переходим к экрану эффектов
         effects_screen = self.manager.get_screen("effects")
-        effects_screen.selected_effects.append(f"Создание существа: {', '.join(self.creatures)}")
+        effects_screen.selected_effects.append(
+            f"Создание существа: {', '.join([f'{c["name"]} (ПО: {c["po"]}, {c["control"]})' for c in self.creatures])}"
+        )
         self.manager.current = "effects"
+        """Очистка данных о существах"""
+        self.creatures = []
+        self.entry_creature.text = ""
+        self.entry_po.text = ""
+        self.spinner_control.text = "Выберите"
+        self.label_selected.text = "Созданные существа: None"
 
     def show_error(self, title, message):
         """Всплывающее окно ошибки"""
@@ -1120,7 +1282,6 @@ class TransformationScreen(ThemedScreen):
         self.add_widget(layout)
 
     def add_transformation(self, instance):
-        """Добавляем параметры превращения"""
         creature_name = self.entry_creature.text.strip()
         po = self.entry_po.text.strip()
 
@@ -1128,21 +1289,40 @@ class TransformationScreen(ThemedScreen):
             try:
                 po = int(po)
                 total_cost = po * 25
-                transformation_desc = f"{creature_name} (ПО: {po}, Стоимость: {total_cost} ОП)"
-                self.transformations.append(transformation_desc)
+                transformation_data = {
+                    "name": creature_name,
+                    "po": po,
+                    "cost": total_cost
+                }
+
+                # Сохраняем в глобальные данные
+                app = App.get_running_app()
+                if not hasattr(app, "user_data"):
+                    app.user_data = {}
+
+                if "transformations" not in app.user_data:
+                    app.user_data["transformations"] = []
+
+                app.user_data["transformations"].append(transformation_data)
+
+                # Обновляем отображение
+                self.transformations.append(f"{creature_name} (ПО: {po})")
                 self.label_selected.text = f"Выбранные превращения: {', '.join(self.transformations)}"
                 self.entry_creature.text = ""
                 self.entry_po.text = ""
             except ValueError:
                 self.show_error("Ошибка", "ПО должно быть числом.")
-        else:
-            self.show_error("Ошибка", "Заполните все поля.")
 
     def finish_selection(self, instance):
         """Сохраняем превращение и переходим к следующему шагу"""
         effects_screen = self.manager.get_screen("effects")
         effects_screen.selected_effects.append(f"Превращение: {', '.join(self.transformations)}")
         self.manager.current = "effects"
+        """Сброс данных о превращениях"""
+        self.transformations = []
+        self.entry_creature.text = ""
+        self.entry_po.text = ""
+        self.label_selected.text = "Выбранные превращения: None"
 
     def show_error(self, title, message):
         """Всплывающее окно ошибки"""
@@ -1182,6 +1362,8 @@ class ShieldSelectionScreen(ThemedScreen):
                 self.manager.current = "barrier_config"
             else:
                 self.show_error("Ошибка", "Выберите Щит или Баррикаду.")
+            """Очистка выбора типа защиты"""
+            self.spinner_shield_type.text = "Выберите"
 
         def show_error(self, title, message):
             """Всплывающее окно ошибки"""
@@ -1229,6 +1411,9 @@ class ShieldConfigScreen(ThemedScreen):
                 self.manager.current = "effects"
             except ValueError:
                 self.show_error("Ошибка", "Введите корректное число.")
+            """Сброс параметров щита"""
+            self.spinner_shield_stat.text = "Выберите"
+            self.entry_shield_value.text = ""
 
         def show_error(self, title, message):
             """Всплывающее окно ошибки"""
@@ -1270,6 +1455,8 @@ class BarrierConfigScreen(ThemedScreen):
                 self.manager.current = "effects"
             except ValueError:
                 self.show_error("Ошибка", "Введите корректное число.")
+            """Очистка параметров баррикады"""
+            self.entry_barrier_value.text = ""
 
         def show_error(self, title, message):
             """Всплывающее окно ошибки"""
@@ -1312,9 +1499,15 @@ class MovementSelectionScreen(ThemedScreen):
         elif distance <= 50:
             cost = distance * 2
         elif distance <= 100:
-            cost = 100 + (distance - 50)  # Например, 60 м → 110 ОП
+            cost = 100 + (distance - 50)
         else:
             cost = 300  # Неограниченное перемещение
+
+        # Сохраняем эффект в user_data
+        app = App.get_running_app()
+        if not hasattr(app, "user_data"):
+            app.user_data = {}
+        app.user_data["movement"] = f"Перемещение: {distance} м ({cost} ОП)"
 
         # Сохраняем эффект в список
         effects_screen = self.manager.get_screen("effects")
@@ -1322,6 +1515,8 @@ class MovementSelectionScreen(ThemedScreen):
 
         # Возвращаемся в меню эффектов
         self.manager.current = "effects"
+        """Очистка поля ввода дистанции перемещения при уходе с экрана"""
+        self.entry_distance.text = ""
 
     def show_error(self, title, message):
         """Всплывающее окно ошибки"""
@@ -1334,44 +1529,56 @@ class MovementSelectionScreen(ThemedScreen):
 
 
 class OtherEffectsScreen(ThemedScreen):
-        """Экран ввода прочих эффектов"""
+    """Экран ввода прочих эффектов"""
 
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.effects = []
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.effects = []  # Список для хранения прочих эффектов
 
-            layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
 
-            self.label_other_effects = Label(text="Введите описание прочего эффекта:")
-            self.entry_other_effects = TextInput(multiline=True)
+        self.label_other_effects = Label(text="Введите описание прочего эффекта:")
+        self.entry_other_effects = TextInput(multiline=True)
 
-            self.button_add = Button(text="Добавить", on_press=self.add_effect)
-            self.button_done = Button(text="Готово", on_press=self.finish_selection)
+        self.button_add = Button(text="Добавить", on_press=self.add_effect)
+        self.button_done = Button(text="Готово", on_press=self.finish_selection)
 
-            self.label_selected = Label(text="Выбранные эффекты: None", size_hint_y=None, height=40)
+        self.label_selected = Label(text="Выбранные эффекты: None", size_hint_y=None, height=40)
 
-            layout.add_widget(self.label_other_effects)
-            layout.add_widget(self.entry_other_effects)
-            layout.add_widget(self.button_add)
-            layout.add_widget(self.label_selected)
-            layout.add_widget(self.button_done)
+        layout.add_widget(self.label_other_effects)
+        layout.add_widget(self.entry_other_effects)
+        layout.add_widget(self.button_add)
+        layout.add_widget(self.label_selected)
+        layout.add_widget(self.button_done)
 
-            self.add_widget(layout)
+        self.add_widget(layout)
 
-        def add_effect(self, instance):
-            """Добавляем прочий эффект в список"""
-            effect_desc = self.entry_other_effects.text.strip()
+    def add_effect(self, instance):
+        """Добавляем прочий эффект в список"""
+        effect_desc = self.entry_other_effects.text.strip()
 
-            if effect_desc:
-                self.effects.append(effect_desc)
-                self.label_selected.text = f"Выбранные эффекты: {', '.join(self.effects)}"
-                self.entry_other_effects.text = ""
+        if effect_desc:
+            self.effects.append(effect_desc)
+            self.label_selected.text = f"Выбранные эффекты: {', '.join(self.effects)}"
+            self.entry_other_effects.text = ""
 
-        def finish_selection(self, instance):
-            """Сохраняем прочие эффекты и переходим к следующему шагу"""
-            effects_screen = self.manager.get_screen("effects")
-            effects_screen.selected_effects.append(f"Прочие эффекты: {', '.join(self.effects)}")
-            self.manager.current = "effects"
+    def finish_selection(self, instance):
+        """Сохраняем прочие эффекты и переходим к следующему шагу"""
+        app = App.get_running_app()
+        if not hasattr(app, "user_data"):
+            app.user_data = {}
+
+        # Сохраняем прочие эффекты в user_data
+        app.user_data["other_effects"] = self.effects
+
+        # Переходим к экрану эффектов
+        effects_screen = self.manager.get_screen("effects")
+        effects_screen.selected_effects.append(f"Прочие эффекты: {', '.join(self.effects)}")
+        self.manager.current = "effects"
+        """Сброс списка эффектов"""
+        self.effects = []
+        self.entry_other_effects.text = ""
+        self.label_selected.text = "Выбранные эффекты: None"
 
 
 class RestrictionScreen(ThemedScreen):
@@ -1424,81 +1631,209 @@ class RestrictionScreen(ThemedScreen):
             effects_screen = self.manager.get_screen("effects")
             effects_screen.selected_effects.append(f"Ограничения: {', '.join(self.restrictions)}")
             self.manager.current = "effects"
+            """Очистка списка ограничений"""
+            self.restrictions = []
+            self.entry_restriction.text = ""
+            self.entry_discount.text = ""
+            self.label_selected.text = "Выбранные ограничения: None"
 
         def show_error(self, title, message):
             """Всплывающее окно ошибки"""
             popup = Popup(title=title, content=Label(text=message), size_hint=(0.6, 0.3))
             popup.open()
 
+def calculate_damage_cost(damage_str):
+    """Рассчитывает стоимость урона по формату 'Урон: 2d8'."""
+    if not damage_str or "Урон:" not in damage_str:
+        return 0
+
+    try:
+        # Извлекаем часть после "Урон:"
+        dice_part = damage_str.split(":")[1].strip()
+
+        if "единицы" in dice_part:
+            num = int(dice_part.split("x")[0])
+            return num * 5  # 5 ОП за каждую единицу урона
+        else:
+            num, dice_type = dice_part.split("x")
+            num = int(num)
+
+            if dice_type == "d4":
+                return 5 if num == 1 else (num - 1) * 20 + 5
+            elif dice_type == "d6":
+                return 10 if num == 1 else (num - 1) * 25 + 10
+            elif dice_type == "de":
+                return num * 25
+            elif dice_type == "d8":
+                return 20 if num == 1 else (num - 1) * 30 + 20
+            elif dice_type == "d10":
+                return 30 if num == 1 else (num - 1) * 35 + 30
+            elif dice_type == "d12":
+                return num * 40
+    except:
+        return 0
+
+def calculate_healing_cost(healing_str):
+    """Рассчитывает стоимость лечения по формату 'Лечение: 3d6'."""
+    if not healing_str or "Лечение:" not in healing_str:
+        return 0
+
+    try:
+        # Извлекаем часть после "Лечение:"
+        dice_part = healing_str.split(":")[1].strip()
+
+        if "единицы" in dice_part:
+            num = int(dice_part.split("x")[0])
+            return num * 4  # 4 ОП за каждую единицу лечения
+        else:
+            num, dice_type = dice_part.split("x")
+            num = int(num)
+
+            if dice_type == "d4":
+                return 5 if num == 1 else (num - 1) * 20 + 5
+            elif dice_type == "d6":
+                return 10 if num == 1 else (num - 1) * 25 + 10
+            elif dice_type == "de":
+                return num * 25
+            elif dice_type == "d8":
+                return 20 if num == 1 else (num - 1) * 30 + 20
+            elif dice_type == "d10":
+                return 30 if num == 1 else (num - 1) * 35 + 30
+            elif dice_type == "d12":
+                return num * 40
+    except:
+        return 0
+
 
 class FinalSummaryScreen(Screen):
-    """Финальный экран, отображающий сводку способности."""
+    """Финальный экран с исправленным отображением текста"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        layout = FloatLayout()
+        self.layout = FloatLayout()
 
-        # Основной контейнер для текста
-        self.scroll_view = ScrollView(size_hint=(1, 0.8), pos_hint={'top': 0.9})
-        self.content_layout = BoxLayout(orientation='vertical', size_hint_y=None, padding=10, spacing=10)
-        self.content_layout.bind(minimum_height=self.content_layout.setter('height'))
+        # Основной контейнер с прокруткой
+        self.scroll = ScrollView(
+            size_hint=(0.95, 0.75),
+            pos_hint={'center_x': 0.5, 'top': 0.85},
+            do_scroll_x=False,  # Отключаем горизонтальную прокрутку
+            bar_width=10
+        )
 
-        self.scroll_view.add_widget(self.content_layout)
-        layout.add_widget(self.scroll_view)
+        # Контейнер для текста
+        self.text_layout = BoxLayout(
+            orientation='vertical',
+            size_hint_y=None,
+            padding=[20, 10],
+            spacing=10
+        )
+        self.text_layout.bind(minimum_height=self.text_layout.setter('height'))
+
+        self.scroll.add_widget(self.text_layout)
+        self.layout.add_widget(self.scroll)
 
         # Кнопки
-        self.button_restart = Button(text="Создать новую способность", size_hint=(0.45, 0.1), pos_hint={'x': 0.025, 'y': 0.025})
-        self.button_save = Button(text="Сохранить как PNG", size_hint=(0.45, 0.1), pos_hint={'x': 0.525, 'y': 0.025})
-        self.button_exit = Button(text="Выйти", size_hint=(0.45, 0.1), pos_hint={'x': 0.525, 'y': 0.15})
+        btn_layout = BoxLayout(
+            size_hint=(0.9, 0.1),
+            pos_hint={'center_x': 0.5, 'y': 0.02},
+            spacing=10
+        )
 
-        self.button_restart.bind(on_press=self.restart_creation)
-        self.button_save.bind(on_press=self.save_as_png)
-        self.button_exit.bind(on_press=self.finish)
+        self.btn_restart = Button(text="Новая способность")
+        self.btn_save = Button(text="Сохранить PNG")
+        self.btn_exit = Button(text="Выход")
 
-        layout.add_widget(self.button_restart)
-        layout.add_widget(self.button_save)
-        layout.add_widget(self.button_exit)
+        btn_layout.add_widget(self.btn_restart)
+        btn_layout.add_widget(self.btn_save)
+        btn_layout.add_widget(self.btn_exit)
 
-        self.add_widget(layout)
+        self.layout.add_widget(btn_layout)
+        self.add_widget(self.layout)
+
+        # Привязка событий
+        self.btn_restart.bind(on_press=self.restart_creation)
+        self.btn_save.bind(on_press=self.save_as_png)
+        self.btn_exit.bind(on_press=self.finish)
 
     def on_pre_enter(self):
-        """Обновляем отображаемые данные перед входом на экран."""
-        # Очищаем содержимое перед добавлением новых данных
+        """Обновляем содержимое перед показом экрана"""
+        self.text_layout.clear_widgets()
+
         app = App.get_running_app()
         user_data = getattr(app, "user_data", {})
 
-        print(f"Debug: calculate_total_op. Input user_data: {user_data}")
-
+        # Получаем данные
         name = user_data.get("entry_name", "Без названия")
         description = user_data.get("entry_description", "Нет описания")
-
-        # Подсчет ОП
         total_op, effect_details = calculate_total_op(user_data)
 
-        duration = user_data.get("spinner_duration", "Моментально")
-        effect_details[f"Продолжительность: {duration}"] = calculate_duration_cost(duration)
-        # Добавляем урон и лечение в список параметров
-        damage = user_data.get("damage", None)
-        healing = user_data.get("healing", None)
-
-        if damage:
-            effect_details[f"{damage}"] = calculate_damage_cost(damage)
-        if healing:
-            effect_details[f"{healing}"] = calculate_damage_cost(
-                healing)  # Стоимость лечения рассчитывается аналогично урону
-
-        # Формируем текстовые блоки
-        parameter_text = "\n".join(
-            [f"{param} ({cost} ОП)" for param, cost in effect_details.items()]
+        # Создаем текстовые блоки с переносами
+        name_label = Label(
+            text=f"[size=28][b]{name}[/b][/size]",
+            size_hint_y=None,
+            height=60,
+            halign='center',
+            valign='middle',
+            color=(0.9, 0.9, 0.9, 1),
+            markup=True
         )
 
-        # Формируем список эффектов
-        effects = user_data.get("selected_effects", [])
-        effects_text = "\n".join(effects)
+        desc_label = Label(
+            text=f"[size=20]{description}[/size]",
+            size_hint_y=None,
+            height=self.calculate_text_height(description, 60),
+            halign='left',
+            valign='top',
+            text_size=(Window.width * 0.9, None),
+            markup=True
+        )
 
-        # Добавляем пустую строку для отступа
-        self.content_layout.add_widget(Label(text="", size_hint_y=None, height=100))
-        self.content_layout.add_widget(Label(text=f"{name}\n{description}:\n{parameter_text} \n Общая стоимость: {total_op} ОП" if parameter_text else "Параметры: -", size_hint_y=None, height=30))
+        params_label = Label(
+            text=self.format_effects(effect_details),
+            size_hint_y=None,
+            height=self.calculate_effects_height(effect_details),
+            halign='left',
+            valign='top',
+            text_size=(Window.width * 0.9, None),
+            markup=True
+        )
+
+        total_label = Label(
+            text=f"[size=24][b]Общая стоимость: [color=#4CAF50]{total_op} ОП[/color][/b][/size]",
+            size_hint_y=None,
+            height=60,
+            halign='center',
+            valign='middle',
+            markup=True
+        )
+
+        self.text_layout.add_widget(name_label)
+        self.text_layout.add_widget(desc_label)
+        self.text_layout.add_widget(params_label)
+        self.text_layout.add_widget(total_label)
+
+    def calculate_text_height(self, text, min_height):
+        """Вычисляем высоту текста с учетом переносов"""
+        label = Label(text=text, text_size=(Window.width * 0.9, None))
+        label.texture_update()
+        return max(label.texture_size[1] + 20, min_height)
+
+    def calculate_effects_height(self, effects):
+        """Вычисляем высоту блока с эффектами"""
+        text = self.format_effects(effects)
+        label = Label(text=text, text_size=(Window.width * 0.9, None))
+        label.texture_update()
+        return label.texture_size[1] + 20
+
+    def format_effects(self, effects):
+        """Форматируем список эффектов для отображения"""
+        if not effects:
+            return "Параметры не указаны"
+
+        formatted = "[size=16][b]Параметры:[/b][/size]\n"
+        for param, cost in effects.items():
+            formatted += f"• {param}: [b]{cost} ОП[/b]\n"
+        return formatted
 
     def restart_creation(self, instance):
         """Сброс всех данных и перезапуск."""
@@ -1555,75 +1890,24 @@ class FinalSummaryScreen(Screen):
             )
             popup.open()
 
-def calculate_damage_cost(damage_str):
-    """Рассчитывает стоимость урона по формату 'Урон: 2d8'."""
-    match = re.findall(r'(\d+)(d\d+|единицы)', damage_str)
-    if not match:
-        return 0  # Если формат неверный, возвращаем 0
 
-    num, dice_type = int(match[0][0]), match[0][1]
-    cost = 0
-
-    if dice_type == "единицы":
-        cost = num * 5
-    elif dice_type == "d4":
-        cost = 5 if num == 1 else (num - 1) * 25 + 5
-    elif dice_type == "d6":
-        cost = 10 if num == 1 else (num - 1) * 35 + 10
-    elif dice_type == "d8":
-        cost = 20 if num == 1 else (num - 1) * 30 + 20
-    elif dice_type == "de":
-        cost = num * 25
-    elif dice_type == "d10":
-        cost = 30 if num == 1 else (num - 1) * 35 + 30
-    elif dice_type == "d12":
-        cost = num * 40
-
-    return cost
-
-def calculate_healing_cost(healing_str):
-    """Рассчитывает стоимость лечения по формату 'Лечение: 3d6'."""
-    match = re.findall(r'(\d+)(d\d+|единицы)', healing_str)
-    if not match:
-        return 0  # Если формат неверный, возвращаем 0
-
-    num, dice_type = int(match[0][0]), match[0][1]
-    cost = 0
-
-    if dice_type == "единицы":
-        cost = num * 4  # Лечение немного дешевле
-    elif dice_type == "d4":
-        cost = 4 if num == 1 else (num - 1) * 20 + 4
-    elif dice_type == "d6":
-        cost = 8 if num == 1 else (num - 1) * 30 + 8
-    elif dice_type == "d8":
-        cost = 16 if num == 1 else (num - 1) * 25 + 16
-    elif dice_type == "de":
-        cost = num * 20
-    elif dice_type == "d10":
-        cost = 24 if num == 1 else (num - 1) * 30 + 24
-    elif dice_type == "d12":
-        cost = num * 35
-
-    return cost
 
 def calculate_duration_cost(duration):
     """Рассчитывает стоимость ОП за продолжительность."""
-    if duration.startswith("Раунд"):
+    if "Раунд" in duration:  # Проверяем, содержит ли строка "Раунд"
         rounds = int(re.findall(r'\d+', duration)[0]) if re.findall(r'\d+', duration) else 1
-        return 5 + (rounds - 1) * 10
-    elif duration.startswith("Минуты"):
+        return 5 + (rounds - 1) * 10  # Базовая стоимость 5 ОП + 10 ОП за каждый дополнительный раунд
+    elif "Минут" in duration:  # Проверяем, содержит ли строка "Минут"
         minutes = int(re.findall(r'\d+', duration)[0]) if re.findall(r'\d+', duration) else 1
-        return 50 + minutes * 20
-    elif duration.startswith("Часы"):
+        return 50 + minutes * 20  # Базовая стоимость 50 ОП + 20 ОП за каждую минуту
+    elif "Час" in duration:  # Проверяем, содержит ли строка "Час"
         hours = int(re.findall(r'\d+', duration)[0]) if re.findall(r'\d+', duration) else 1
-        return 120 + hours * 30
+        return 120 + hours * 30  # Базовая стоимость 120 ОП + 30 ОП за каждый час
     elif duration == "До конца сцены":
-        return 40
+        return 40  # Фиксированная стоимость 40 ОП
     elif duration == "Постоянное действие":
-        return 350
+        return 350  # Фиксированная стоимость 350 ОП
     return 0  # Для моментальных эффектов
-
 
 def calculate_total_op(user_data):
     """Рассчитывает общую стоимость ОП с учетом всех элементов."""
@@ -1635,7 +1919,8 @@ def calculate_total_op(user_data):
 
     # Обработка параметров
     action_type = user_data.get("spinner_action_type", "Основное")
-    target_area = user_data.get("spinner_action_area", "Одна цель")
+    target_area = user_data.get("spinner_action_area",
+                                user_data.get("target_area", "Одна цель"))
     duration = user_data.get("spinner_duration", "Моментально")
     probability = user_data.get("spinner_probability", "Проверка")
     range_value = int(user_data.get("entry_range", "1") or 1)
@@ -1664,39 +1949,31 @@ def calculate_total_op(user_data):
     elif target_area == "Одна цель":
         cost = 10
     elif target_area.startswith("Несколько целей"):
-        num_targets = int(user_data.get("entry_target_count", "1") or 1)
-        cost = 10 + (num_targets - 1) * 5
-    elif target_area == "Площадь":
-        area_size = int(user_data.get("entry_area_size", "3") or 3)
-        cost = (area_size // 3) * 10
-        if user_data.get("switch_can_move", False):
-            move_range = int(user_data.get("entry_move_range", "0") or 0)
-            cost += (move_range // 3) * 5
+        # Извлекаем количество целей из строки, например, "Несколько целей (3)"
+        num_targets = int(re.findall(r'\d+', target_area)[0]) if re.findall(r'\d+', target_area) else 2
+        cost = 10 + (num_targets - 1) * 5  # Базовая стоимость 10 ОП + 5 ОП за каждую дополнительную цель
+    elif target_area.startswith("Площадь"):
+        # Извлекаем размер площади и дальность перемещения (если есть)
+        area_size = int(re.findall(r'\d+', target_area)[0]) if re.findall(r'\d+', target_area) else 3
+        cost = (area_size // 3) * 10  # Базовая стоимость: 10 ОП за каждые 3 м²
+
+        # Если включено перемещение, добавляем стоимость
+        if "перемещение" in target_area:
+            move_range = int(re.findall(r'\d+', target_area.split("перемещение")[-1])[0]) if re.findall(r'\d+',
+                                                                                                        target_area.split(
+                                                                                                            "перемещение")[
+                                                                                                            -1]) else 3
+            cost += (move_range // 3) * 5  # 5 ОП за каждые 3 м дальности перемещения
     else:
         cost = 0
 
     effect_details[f"Область действия: {target_area}"] = cost
     total_op += cost
 
+    duration_cost = calculate_duration_cost(duration)
     # Продолжительность
-    if duration.startswith("Раунд"):
-        rounds = int(duration.split()[0])
-        total_op += 5 + (rounds - 1) * 10
-        effect_details[f"Продолжительность: {duration}"] = 5 + (rounds - 1) * 10
-    elif duration.startswith("Минуты"):
-        minutes = int(duration.split()[0])
-        total_op += 50 + minutes * 20
-        effect_details[f"Продолжительность: {duration}"] = 50 + minutes * 20
-    elif duration.startswith("Часы"):
-        hours = int(duration.split()[0])
-        total_op += 120 + hours * 30
-        effect_details[f"Продолжительность: {duration}"] = 120 + hours * 30
-    elif duration == "До конца сцены":
-        total_op += 40
-        effect_details[f"Продолжительность: {duration}"] = 40
-    elif duration == "Постоянное действие":
-        total_op += 350
-        effect_details[f"Продолжительность: {duration}"] = 350
+    effect_details[f"Продолжительность: {duration}"] = duration_cost
+    total_op += duration_cost
 
     # Вероятность успеха
     total_op += probability_costs.get(probability, 0)
@@ -1715,60 +1992,32 @@ def calculate_total_op(user_data):
     elif range_value > 300:
         total_op += 80 + (range_value - 300) // 50
         effect_details[f"Дальность: {range_value} м"] = 80 + (range_value - 300) // 50
+    elif range_value == 0 or 1:
+        total_op += 0
+        effect_details[f"Дальность: {range_value} м"] = 0
     else:
         total_op += 100
         effect_details[f"Дальность: {range_value} м"] = 100
 
+    print("Effects before calculation:", effects)
     # Обработка эффектов
     for effect in effects:
         try:
             # Обработка призыва существ
             if "Создание существа" in effect:
-                parts = re.findall(r'\((.*?)\)', effect)
-                if parts:
-                    creature_info = parts[0]
-                    cost = int(re.findall(r'\d+', creature_info.split(",")[-1])[0])
-                    effect_details[f"Создание существа: {creature_info}"] = cost
-                    total_op += cost
+                creatures = user_data.get("created_creatures", [])
+                for creature in creatures:
+                    effect_details[
+                        f"Создание существа: {creature['name']} (ПО: {creature['po']}, {creature['control']})"
+                    ] = creature['cost']
+                    total_op += creature['cost']
 
             # Обработка превращения
             elif "Превращение" in effect:
-                parts = re.findall(r'\((.*?)\)', effect)
-                if parts:
-                    transformation_info = parts[0]
-                    cost = int(re.findall(r'\d+', transformation_info.split(",")[-1])[0])
-                    effect_details[f"Превращение: {transformation_info}"] = cost
-                    total_op += cost
-
-            # Обработка лечения
-            elif "Лечение" in effect:
-                parts = re.findall(r'(\d+)(d\d+|единицы)', effect)
-                if parts:
-                    num = int(parts[0][0])  # Количество (например, 2 для 2d8)
-                    dice_type = parts[0][1]  # Тип (например, d8 или "единицы")
-
-                    cost = 0  # Инициализируем стоимость
-
-                    # Расчет стоимости в зависимости от типа
-                    if dice_type == "единицы":
-                        cost = num * 5  # Единицы: введенное значение * 5
-                    elif dice_type == "d4":
-                        cost = 5 if num == 1 else (num - 1) * 25 + 5
-                    elif dice_type == "d6":
-                        cost = 10 if num == 1 else (num - 1) * 35 + 10
-                    elif dice_type == "d8":
-                        cost = 20 if num == 1 else (num - 1) * 30 + 20
-                    elif dice_type == "de":
-                        cost = num * 25  # de: введенное число * 25
-                    elif dice_type == "d10":
-                        cost = 30 if num == 1 else (num - 1) * 35 + 30
-                    elif dice_type == "d12":
-                        cost = num * 40  # d12: введенное число * 40
-                    else:
-                        cost = 0  # Если тип не распознан, стоимость 0
-
-                    # Сохраняем стоимость эффекта
-                    effect_details[f"Лечение: {effect}"] = cost
+                transformations = user_data.get("transformations", [])
+                for transform in transformations:
+                    cost = transform['po'] * 25
+                    effect_details[f"Превращение: {transform['name']} (ПО: {transform['po']})"] = cost
                     total_op += cost
 
             # Обработка дополнительных действий
@@ -1776,6 +2025,21 @@ def calculate_total_op(user_data):
                 actions = effect.split(":")[-1].strip().split(", ")
                 cost = len(actions) * 25  # 25 ОП за каждое дополнительное действие
                 effect_details[f"Доп. действия: {', '.join(actions)}"] = cost
+                total_op += cost
+
+            elif "Перемещение" in effect:
+                distance = int(re.findall(r'\d+', effect)[0]) if re.findall(r'\d+', effect) else 0
+                if distance <= 5:
+                    cost = distance * 5
+                elif distance <= 15:
+                    cost = distance * 3
+                elif distance <= 50:
+                    cost = distance * 2
+                elif distance <= 100:
+                    cost = 100 + (distance - 50)
+                else:
+                    cost = 300
+                effect_details[f"Перемещение: {distance} м"] = cost
                 total_op += cost
 
             # Обработка дескрипторов
@@ -1787,10 +2051,22 @@ def calculate_total_op(user_data):
 
             # Обработка бонусов и штрафов
             elif "Бонусы/Штрафы" in effect:
-                bonuses = effect.split(":")[-1].strip().split(", ")
-                cost = 20 + (len(bonuses) - 1) * 15  # 20 + 15 за каждый дополнительный бонус/штраф
-                effect_details[f"Бонусы/Штрафы: {', '.join(bonuses)}"] = cost
-                total_op += cost
+                bonuses = user_data.get("bonuses", [])
+                for bonus in bonuses:
+                    characteristic = bonus["characteristic"]
+                    value = bonus["value"]
+                    absolute_value = bonus["absolute_value"]
+
+                    # Расчет стоимости по формуле: (|value| - 1) * 15 + 20
+                    cost = (absolute_value - 1) * 15 + 20
+
+                    # Определяем тип (бонус или штраф)
+                    effect_type = "Бонус" if value > 0 else "Штраф"
+
+                    # Формируем запись с указанием типа
+                    effect_details[f"{effect_type}: {characteristic}: {value}"] = cost
+                    total_op += cost
+
 
             # Обработка щитов
             elif "Щит" in effect:
@@ -1804,6 +2080,16 @@ def calculate_total_op(user_data):
                 value = int(re.findall(r'\d+', effect)[0]) if re.findall(r'\d+', effect) else 10
                 cost = value + 20  # Введенное количество + 20
                 effect_details[f"Баррикада: {effect}"] = cost
+                total_op += cost
+
+            #uron i lechenie
+            elif "Урон" in effect:
+                cost = calculate_damage_cost(effect)
+                effect_details[effect] = cost
+                total_op += cost
+            elif "Лечение" in effect:
+                cost = calculate_healing_cost(effect)
+                effect_details[effect] = cost
                 total_op += cost
 
             # Обработка прочих эффектов
@@ -1826,7 +2112,6 @@ def calculate_total_op(user_data):
             total_op += 0
 
     return total_op, effect_details
-
 
 
 class AbilityApp(App):
