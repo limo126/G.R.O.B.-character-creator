@@ -1111,7 +1111,7 @@ class BonusesSelectionScreen(ThemedScreen):
                 }
                 self.bonuses.append(bonus)
                 # Обновляем список выбранных бонусов/штрафов
-                self.label_selected.text = f"Выбранные бонусы/штрафы: {', '.join([f'{b["characteristic"]}: {b["value"]}' for b in self.bonuses])}"
+                self.label_selected.text = f"""Выбранные бонусы/штрафы: {', '.join([f'{b["characteristic"]}: {b["value"]}' for b in self.bonuses])}"""
                 self.entry_bonuses.text = ""
                 self.entry_bonuses_value.text = ""
             except ValueError:
@@ -1130,7 +1130,7 @@ class BonusesSelectionScreen(ThemedScreen):
 
         # Переходим к экрану эффектов
         effects_screen = self.manager.get_screen("effects")
-        effects_screen.selected_effects.append(f"Бонусы/Штрафы: {', '.join([f'{b['characteristic']}: {b['value']}' for b in self.bonuses])}")
+        effects_screen.selected_effects.append(f"""Бонусы/Штрафы: {', '.join([f'''{b['characteristic']}: {b['value']}''' for b in self.bonuses])}""")
         self.manager.current = "effects"
         """Сброс бонусов/штрафов"""
         self.bonuses = []
@@ -1235,7 +1235,7 @@ class CreatureCreationScreen(ThemedScreen):
         # Переходим к экрану эффектов
         effects_screen = self.manager.get_screen("effects")
         effects_screen.selected_effects.append(
-            f"Создание существа: {', '.join([f'{c["name"]} (ПО: {c["po"]}, {c["control"]})' for c in self.creatures])}"
+            f"""Создание существа: {', '.join([f'{c["name"]} (ПО: {c["po"]}, {c["control"]})' for c in self.creatures])}"""
         )
         self.manager.current = "effects"
         """Очистка данных о существах"""
